@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # 1. Наш основной сервер маршрутизации (FastAPI)
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - rasa
+    environment:
+      # FastAPI сможет обращаться к сервисам по названиям контейнеров
+      - RASA_URL=http://rasa:5005
+      - REDIS_URL=redis://redis:6379/0
+
+  # 2. Нейронная сеть (Rasa NLU)
+  rasa:
+    # Официальный образ: работает одинаково стабильно на любой ОС
+    image: rasa/rasa:3.6.20-full
+    volumes:
+      - ./rasa_bot:/app
+    ports:
+      - "5005:5005"
+    command:
+      - run
+      - --enable-api
+      - --cors
+      - "*"
+
+  # 3. База данных для "памяти" чатов
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"

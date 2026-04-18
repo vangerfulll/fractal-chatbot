@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+
+# Rasa models & DB dumps (исключаем лишнюю 'шнягу' в 500 МБ)
+rasa_bot/models/
+dump.rdb
+*.tar.gz

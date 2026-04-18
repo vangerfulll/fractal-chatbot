@@ -1,0 +1,18 @@
+version: "3.1"
+
+rules:
+- rule: Всегда отвечать на приветствие
+  steps:
+  - intent: greet
+  - action: utter_greet
+
+- rule: Перевод на оператора по триггеру
+  steps:
+  - intent: request_operator
+  - action: utter_transfer
+  # Дальнейшая пересылка запросов передается FastAPI/JivoSite
+
+- rule: Ответ про лагеря
+  steps:
+  - intent: ask_faq_camps
+  - action: utter_faq_camps

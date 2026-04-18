@@ -1,0 +1,36 @@
+version: "3.1"
+
+intents:
+  - greet
+  - request_operator
+  - ask_enroll
+  - ask_faq_camps
+
+entities:
+  - discipline
+  - grade
+
+slots:
+  discipline:
+    type: text
+    mappings:
+    - type: from_entity
+      entity: discipline
+  grade:
+    type: text
+    mappings:
+    - type: from_entity
+      entity: grade
+
+responses:
+  utter_greet:
+  - text: "Здравствуйте! Я виртуальный помощник кружков «Фрактал». Я могу помочь вам с расписанием, записью на предмет или рассказать про мероприятия."
+
+  utter_transfer:
+  - text: "Переключаю вас на администратора. Пожалуйста, подождите..."
+
+  utter_ask_enroll:
+  - text: "Отлично! Какой предмет вас интересует (например, математика, физика) и в каком классе учится ребенок?"
+
+  utter_faq_camps:
+  - text: "У нас регулярно проходят городские и выездные лагеря. Подробную информацию можно посмотреть на нашем сайте в разделе лагерей."
