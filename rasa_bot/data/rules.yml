@@ -6,11 +6,10 @@ rules:
   - intent: greet
   - action: utter_greet
 
-- rule: Перевод на оператора по триггеру
+- rule: Перевод на оператора по запросу
   steps:
   - intent: request_operator
   - action: utter_transfer
-  # Дальнейшая пересылка запросов передается FastAPI/JivoSite
 
 - rule: Ответ про лагеря
   steps:

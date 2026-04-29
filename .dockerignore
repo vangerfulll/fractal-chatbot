@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.venv
+venv
+__pycache__
+*.pyc
+.codex_tmp
+rasa_bot/.config
+rasa_bot/.keras
+rasa_bot/.rasa
+rasa_bot/models
+dump.rdb
+*.tar.gz

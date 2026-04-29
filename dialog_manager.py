@@ -1,25 +1,37 @@
 import logging
-from typing import Dict, Any, Tuple
+import re
+from typing import Any, Dict, Tuple
+
 from hollihop_client import HollihopClient
 
 logger = logging.getLogger(__name__)
+
 
 class DialogManager:
     def __init__(self, hollihop_api: HollihopClient):
         self.hollihop = hollihop_api
 
+    def _select_group(self, text: str, groups: list[Dict[str, Any]]) -> Dict[str, Any] | None:
+        clean_text = text.strip().lower()
+        number_match = re.search(r"\d+", clean_text)
+
+        if number_match:
+            idx = int(number_match.group()) - 1
+            if 0 <= idx < len(groups):
+                return groups[idx]
+
+        for group in groups:
+            schedule = str(group.get("schedule", "")).lower()
+            name = str(group.get("name", "")).lower()
+            if clean_text and (clean_text in schedule or clean_text in name):
+                return group
+
+        return None
+
     async def process(self, text: str, rasa_resp: Dict[str, Any], session: Dict[str, Any]) -> Tuple[str, bool, bool]:
-        """
-        Обрабатывает шаг диалога.
-        Возвращает:
-        - reply_text (str): Текст для ответа пользователю
-        - transfer_to_operator (bool): Нужно ли перевести на оператора
-        - lead_created (bool): Был ли только что создан лид (для отправки уведомления)
-        """
-        intent = rasa_resp.get('intent', {}).get('name', 'None')
-        entities = rasa_resp.get('entities', [])
-        
-        # Обновляем данные сессии из найденных сущностей при каждом сообщении
+        intent = rasa_resp.get("intent", {}).get("name", "None")
+        entities = rasa_resp.get("entities", [])
+
         for ent in entities:
             ent_name = ent.get("entity")
             ent_val = ent.get("value")
@@ -27,81 +39,107 @@ class DialogManager:
                 session[ent_name] = ent_val
 
         state = session.get("state", "IDLE")
-        reply_text = ""
-        should_transfer = False
-        lead_created = False
 
-        # --- ГЛОБАЛЬНЫЕ ИНТЕНТЫ ---
         if intent == "request_operator":
             return "Переводим на оператора...", True, False
 
         if intent == "ask_faq_camps":
             session["state"] = "IDLE"
-            return "У нас множество выездных и городских смен! Вся документация на сайте fractalclub.ru/camps", False, False
+            return "У нас есть выездные и городские смены. Подробности: fractalclub.ru/camps", False, False
 
         if intent == "ask_enroll" and state == "IDLE":
             session["state"] = "AWAITING_GRADE_OR_DISCIPLINE"
             state = "AWAITING_GRADE_OR_DISCIPLINE"
 
-        # --- STATE MACHINE ВОРОНКИ ---
-        
         if state == "AWAITING_GRADE_OR_DISCIPLINE":
             discipline = session.get("discipline")
             grade = session.get("grade")
-            
+
             if not discipline and not grade:
-                return "Отлично! Какой предмет вас интересует (математика, физика, программирование) и для какого класса?", False, False
-            elif not discipline:
+                return "Отлично! Какой предмет вас интересует и для какого класса?", False, False
+            if not discipline:
                 return "Понял вас. А какой предмет вам больше интересен?", False, False
-            elif not grade:
+            if not grade:
                 return "Хорошо. А в каком классе учится ребенок?", False, False
-            else:
-                # Все данные собраны, переходим к поиску площадок
-                session["state"] = "AWAITING_LOCATION"
-                state = "AWAITING_LOCATION"
-                
+
+            session["state"] = "AWAITING_LOCATION"
+            state = "AWAITING_LOCATION"
+
         if state == "AWAITING_LOCATION":
             discipline = session.get("discipline")
             grade = session.get("grade")
             locations = await self.hollihop.get_locations(discipline, grade)
-            
+
             if not locations:
                 session["state"] = "IDLE"
-                return f"К сожалению, сейчас нет доступных площадок по запросу: {discipline} для {grade} класса. Оставьте контакт, мы вам перезвоним!", True, False
-                
-            loc_list = ", ".join(locations)
+                return (
+                    f"К сожалению, сейчас нет доступных площадок по запросу: {discipline}, {grade}. "
+                    "Оставьте контакт, мы вам перезвоним.",
+                    True,
+                    False,
+                )
+
             session["state"] = "AWAITING_GROUP"
-            return f"Мы нашли следующие площадки для {discipline} ({grade} класс): {loc_list}. Какая вам удобнее всего?", False, False
+            loc_list = ", ".join(locations)
+            return (
+                f"Мы нашли площадки для {discipline} ({grade}): {loc_list}. "
+                "Какая вам удобнее всего?",
+                False,
+                False,
+            )
 
         if state == "AWAITING_GROUP":
             location = session.get("location")
-            # Если Rasa выцепила локацию
             if not location:
-                # Эвристика: если пользователь просто написал название в ответ, запишем его
                 session["location"] = text
                 location = text
-                
-            groups = await self.hollihop.get_groups_for_location(session.get("discipline"), session.get("grade"), location)
-            
+
+            groups = await self.hollihop.get_groups_for_location(
+                session.get("discipline"),
+                session.get("grade"),
+                location,
+            )
+
             if not groups:
                 return f"На площадке {location} пока не найдено групп. Попробуем другую?", False, False
-                
+
             reply = "Отлично! Вот доступные группы:\n"
-            for idx, g in enumerate(groups, 1):
-                reply += f"{idx}. {g['name']} ({g['schedule']}) - мест: {g['vacancy']}\n"
+            for idx, group in enumerate(groups, 1):
+                reply += f"{idx}. {group['name']} ({group['schedule']}) - мест: {group['vacancy']}\n"
             reply += "\nНапишите номер группы или время, которое вам подходит."
+
+            session["available_groups"] = groups
+            session["state"] = "AWAITING_GROUP_SELECTION"
+            return reply, False, False
+
+        if state == "AWAITING_GROUP_SELECTION":
+            groups = session.get("available_groups", [])
+            selected_group = self._select_group(text, groups)
+
+            if not selected_group:
+                return (
+                    "Не смог определить группу. Напишите, пожалуйста, номер группы из списка "
+                    "или время занятия.",
+                    False,
+                    False,
+                )
+
+            session["group_id"] = selected_group["id"]
+            session["group_name"] = selected_group.get("name")
+            session["group_schedule"] = selected_group.get("schedule")
             session["state"] = "AWAITING_NAME"
-            # Сохраняем первую группу по умолчанию для демо-записи, так как нужен сложный парсер выбора
-            session["group_id"] = groups[0]["id"] 
-            return reply + "\nОпределились? Тогда напишите, пожалуйста, как к вам обращаться (Ваше Имя).", False, False
+            return (
+                "Отлично, группу зафиксировал. Напишите, пожалуйста, как к вам обращаться.",
+                False,
+                False,
+            )
 
         if state == "AWAITING_NAME":
             session["parent_name"] = text
             session["state"] = "AWAITING_PHONE"
-            return f"Очень приятно, {text}! И последний шаг: оставьте ваш номер телефона.", False, False
+            return f"Очень приятно, {text}! Оставьте, пожалуйста, ваш номер телефона.", False, False
 
         if state == "AWAITING_PHONE":
-            # Простой парсинг контакта. Если содержит цифры - считаем телефоном
             if any(char.isdigit() for char in text) and len(text) > 6:
                 session["phone"] = text
                 success = await self.hollihop.create_lead(
@@ -109,19 +147,36 @@ class DialogManager:
                     phone=session["phone"],
                     child_name="Ребенок (уточнить)",
                     group_id=session.get("group_id", 0),
-                    comment="Заявка через JivoSite бота"
+                    comment=(
+                        "Заявка через JivoSite бота. "
+                        f"Группа: {session.get('group_name', 'не выбрана')}, "
+                        f"расписание: {session.get('group_schedule', 'не выбрано')}"
+                    ),
                 )
                 session["state"] = "IDLE"
-                
-                if success:
-                    return "Спасибо! Ваша карточка успешно создана в CRM. Администратор свяжется с вами в течение дня.", False, True
-                else:
-                    return "Спасибо! Заявка принята, мы перезвоним вам в ближайшее время.", True, True
-            else:
-                return "Хм, не похоже на номер телефона. Пожалуйста, напишите телефон цифрами.", False, False
 
-        # Если стейт IDLE и интент не понятен
+                if success:
+                    return (
+                        "Спасибо! Ваша карточка успешно создана в CRM. "
+                        "Администратор свяжется с вами в течение дня.",
+                        False,
+                        True,
+                    )
+                return "Спасибо! Заявка принята, мы перезвоним вам в ближайшее время.", True, True
+
+            return "Не похоже на номер телефона. Пожалуйста, напишите телефон цифрами.", False, False
+
         if intent == "greet":
-            return "Здравствуйте! Я интеллектуальный помощник клуба «Фрактал». Хотите записаться в группу или узнать о лагерях?", False, False
-            
-        return "Не совсем понял вас. Вы можете спросить про запись в кружок или про наши лагеря. Позвать оператора?", False, False
+            return (
+                "Здравствуйте! Я помощник клуба «Фрактал». Хотите записаться в группу "
+                "или узнать о лагерях?",
+                False,
+                False,
+            )
+
+        return (
+            "Не совсем понял вас. Вы можете спросить про запись в кружок или про наши лагеря. "
+            "Позвать оператора?",
+            False,
+            False,
+        )

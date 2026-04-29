@@ -1,65 +1,63 @@
-import httpx
 import logging
-from typing import Optional, Dict, Any
+import time
+import uuid
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
+
 class JivoClient:
-    """
-    Клиент для взаимодействия с Bot API платформы JivoSite.
-    Позволяет отправлять сообщения в чат клиенту и переводить диалог на живого человека.
-    """
-    def __init__(self, api_url: str, bot_token: str):
-        # https://bot.jivosite.com по умолчанию
-        self.api_url = api_url.rstrip('/')
+    """Client for Jivo Bot API outgoing events."""
+
+    def __init__(self, api_url: str, provider_id: str, bot_token: str):
+        self.api_url = api_url.rstrip("/")
+        self.provider_id = provider_id
         self.bot_token = bot_token
 
-    async def send_message(self, chat_id: int, text: str) -> bool:
-        """
-        Метод отправки текстового ответа пользователю в окно чата JivoSite.
-        """
-        # Эндпоинт отправки сообщений, зависит от API Jivo-ботов
-        endpoint = f"{self.api_url}/webhooks/{self.bot_token}"
+    @property
+    def endpoint(self) -> str:
+        if not self.provider_id or not self.bot_token:
+            raise ValueError("JIVO_PROVIDER_ID and JIVO_BOT_TOKEN must be configured")
+        return f"{self.api_url}/webhooks/{self.provider_id}/{self.bot_token}"
+
+    async def send_message(self, client_id: str, chat_id: str, text: str) -> bool:
         payload = {
-            "event": "message",
-            "chat_id": chat_id,
+            "id": str(uuid.uuid4()),
+            "client_id": str(client_id),
+            "chat_id": str(chat_id),
             "message": {
-                "type": "text",
-                "text": text
-            }
+                "type": "TEXT",
+                "text": text,
+                "timestamp": int(time.time()),
+            },
+            "event": "BOT_MESSAGE",
         }
-        
+
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(endpoint, json=payload, timeout=5.0)
+                response = await client.post(self.endpoint, json=payload, timeout=3.0)
                 response.raise_for_status()
-                logger.info(f"Отправлено сообщение в чат {chat_id}")
+                logger.info("Sent bot message to Jivo chat %s", chat_id)
                 return True
-            except httpx.HTTPError as e:
-                logger.error(f"Ошибка при ответе в JivoSite: {e}")
+            except (ValueError, httpx.HTTPError) as exc:
+                logger.error("Failed to send bot message to Jivo: %s", exc)
                 return False
 
-    async def transfer_to_operator(self, chat_id: int, comment: str = "Требуется помощь оператора") -> bool:
-        """
-        Переключение диалога на живого оператора. 
-        Бот перестает обрабатывать события из этого чата, пока не вернут управление.
-        """
-        endpoint = f"{self.api_url}/webhooks/{self.bot_token}"
+    async def transfer_to_operator(self, client_id: str, chat_id: str) -> bool:
         payload = {
-            "event": "invoke",
-            "invoke": {
-                "command": "transfer",
-                "chat_id": chat_id,
-                "comment": comment
-            }
+            "id": str(uuid.uuid4()),
+            "client_id": str(client_id),
+            "chat_id": str(chat_id),
+            "event": "INVITE_AGENT",
         }
-        
+
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(endpoint, json=payload, timeout=5.0)
+                response = await client.post(self.endpoint, json=payload, timeout=3.0)
                 response.raise_for_status()
-                logger.info(f"Чат {chat_id} переведен на администратора")
+                logger.info("Invited agent to Jivo chat %s", chat_id)
                 return True
-            except httpx.HTTPError as e:
-                logger.error(f"Ошибка перевода на оператора: {e}")
+            except (ValueError, httpx.HTTPError) as exc:
+                logger.error("Failed to invite Jivo agent: %s", exc)
                 return False

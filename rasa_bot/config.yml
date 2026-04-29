@@ -2,7 +2,6 @@ recipe: default.v1
 language: ru
 
 pipeline:
-  # Простой пайплайн для русского языка
 - name: WhitespaceTokenizer
 - name: RegexFeaturizer
 - name: LexicalSyntacticFeaturizer
@@ -26,4 +25,3 @@ policies:
 - name: TEDPolicy
   max_history: 5
   epochs: 100
-assistant_id: 20260408-002021-fast-muffin

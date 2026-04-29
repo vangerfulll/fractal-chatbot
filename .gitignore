@@ -20,3 +20,4 @@ venv.bak/
 rasa_bot/models/
 dump.rdb
 *.tar.gz
+.codex_tmp/

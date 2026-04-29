@@ -1,35 +1,77 @@
-version: '3.8'
-
 services:
-  # 1. Наш основной сервер маршрутизации (FastAPI)
   web:
     build: .
+    restart: unless-stopped
     ports:
       - "8000:8000"
     depends_on:
-      - redis
-      - rasa
+      redis:
+        condition: service_healthy
+      rasa:
+        condition: service_healthy
     environment:
-      # FastAPI сможет обращаться к сервисам по названиям контейнеров
-      - RASA_URL=http://rasa:5005
-      - REDIS_URL=redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-development}
+      MOCK_EXTERNAL_APIS: ${MOCK_EXTERNAL_APIS:-true}
+      JIVO_API_URL: ${JIVO_API_URL:-https://bot.jivosite.com}
+      JIVO_PROVIDER_ID: ${JIVO_PROVIDER_ID:-}
+      JIVO_BOT_TOKEN: ${JIVO_BOT_TOKEN:-}
+      HOLLIHOP_DOMAIN: ${HOLLIHOP_DOMAIN:-}
+      HOLLIHOP_API_KEY: ${HOLLIHOP_API_KEY:-}
+      RASA_URL: ${RASA_URL:-http://rasa:5005}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SMTP_SERVER: ${SMTP_SERVER:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-bot@example.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
-  # 2. Нейронная сеть (Rasa NLU)
   rasa:
-    # Официальный образ: работает одинаково стабильно на любой ОС
     image: rasa/rasa:3.6.20-full
+    restart: unless-stopped
     volumes:
       - ./rasa_bot:/app
-    ports:
-      - "5005:5005"
+    expose:
+      - "5005"
     command:
       - run
       - --enable-api
       - --cors
       - "*"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5005/version', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
-  # 3. База данных для "памяти" чатов
+  rasa-train:
+    image: rasa/rasa:3.6.20-full
+    profiles:
+      - tools
+    volumes:
+      - ./rasa_bot:/app
+    command:
+      - train
+
   redis:
     image: redis:alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_data:
