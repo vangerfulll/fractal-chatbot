@@ -18,6 +18,11 @@ class HollihopClient:
         domain = (domain or "").strip()
         if not domain:
             return ""
+
+        for suffix in ("/Api/V2/", "/Api/V2", "/api/v2/", "/api/v2"):
+            if domain.endswith(suffix):
+                domain = domain[: -len(suffix)]
+
         if not domain.endswith("/"):
             domain += "/"
         return domain
@@ -107,6 +112,8 @@ class HollihopClient:
 
     def _get_ed_units(self, discipline: str, grade: str):
         kwargs: dict[str, Any] = {
+            "types": "Group,MiniGroup",
+            "statuses": "Reserve,Forming,Working",
             "query_days": False,
             "query_fiscal_info": False,
             "query_teacher_prices": False,
