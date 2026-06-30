@@ -37,6 +37,16 @@ class DialogManagerTests(unittest.TestCase):
 
         self.assertEqual(manager._select_group("18:00", groups)["id"], 102)
 
+    def test_normalizes_valid_phone(self):
+        manager = DialogManager(FakeHollihop())
+
+        self.assertEqual(manager._normalize_phone("8 999 123-45-67"), "+79991234567")
+
+    def test_rejects_invalid_phone(self):
+        manager = DialogManager(FakeHollihop())
+
+        self.assertIsNone(manager._normalize_phone("1234567"))
+
     def test_enroll_flow_reaches_phone_step(self):
         async def scenario():
             manager = DialogManager(FakeHollihop())

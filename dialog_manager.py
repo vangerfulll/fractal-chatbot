@@ -2,6 +2,8 @@ import logging
 import re
 from typing import Any, Dict, Tuple
 
+import phonenumbers
+
 from hollihop_client import HollihopClient
 
 logger = logging.getLogger(__name__)
@@ -10,6 +12,17 @@ logger = logging.getLogger(__name__)
 class DialogManager:
     def __init__(self, hollihop_api: HollihopClient):
         self.hollihop = hollihop_api
+
+    def _normalize_phone(self, text: str) -> str | None:
+        try:
+            phone = phonenumbers.parse(text, "RU")
+        except phonenumbers.NumberParseException:
+            return None
+
+        if not phonenumbers.is_valid_number(phone):
+            return None
+
+        return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
 
     def _select_group(self, text: str, groups: list[Dict[str, Any]]) -> Dict[str, Any] | None:
         clean_text = text.strip().lower()
@@ -140,8 +153,9 @@ class DialogManager:
             return f"Очень приятно, {text}! Оставьте, пожалуйста, ваш номер телефона.", False, False
 
         if state == "AWAITING_PHONE":
-            if any(char.isdigit() for char in text) and len(text) > 6:
-                session["phone"] = text
+            phone = self._normalize_phone(text)
+            if phone:
+                session["phone"] = phone
                 success = await self.hollihop.create_lead(
                     name=session.get("parent_name", "Родитель из чата"),
                     phone=session["phone"],
@@ -164,7 +178,7 @@ class DialogManager:
                     )
                 return "Спасибо! Заявка принята, мы перезвоним вам в ближайшее время.", True, True
 
-            return "Не похоже на номер телефона. Пожалуйста, напишите телефон цифрами.", False, False
+            return "Не похоже на номер телефона. Пожалуйста, напишите номер в формате +7XXXXXXXXXX.", False, False
 
         if intent == "greet":
             return (

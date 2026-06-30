@@ -131,8 +131,8 @@ async def health_ready():
     return {"status": "ready", "checks": checks}
 
 
-async def _handle_jivo_webhook(request: Request, token: str | None = None):
-    if token is not None and token != settings.JIVO_BOT_TOKEN:
+async def _handle_jivo_webhook(request: Request, token: str):
+    if not settings.JIVO_BOT_TOKEN or token != settings.JIVO_BOT_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid Jivo token")
 
     payload = await request.json()
@@ -147,11 +147,6 @@ async def _handle_jivo_webhook(request: Request, token: str | None = None):
 @app.post("/webhook/jivosite/{token}")
 async def jivosite_webhook(token: str, request: Request):
     return await _handle_jivo_webhook(request, token)
-
-
-@app.post("/webhook/jivosight")
-async def jivosight_webhook(request: Request):
-    return await _handle_jivo_webhook(request)
 
 
 if __name__ == "__main__":

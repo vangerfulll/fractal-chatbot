@@ -7,7 +7,7 @@ from dialog_manager import DialogManager
 
 rasa_api = RasaClient("http://localhost:5005")
 session_mgr = SessionManager("redis://localhost:6379/0")
-hollihop_api = HollihopClient(base_url="https://api.hollihop.ru/v2", api_key="MOCK_KEY")
+hollihop_api = HollihopClient(domain="https://api.hollihop.ru/v2", api_key="MOCK_KEY")
 dialog_mgr = DialogManager(hollihop_api)
 
 async def chat():

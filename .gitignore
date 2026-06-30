@@ -17,6 +17,9 @@ venv.bak/
 .idea/
 
 # Rasa models & DB dumps (исключаем лишнюю 'шнягу' в 500 МБ)
+rasa_bot/.config/
+rasa_bot/.keras/
+rasa_bot/.rasa/
 rasa_bot/models/
 dump.rdb
 *.tar.gz
