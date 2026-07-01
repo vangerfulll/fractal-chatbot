@@ -152,7 +152,7 @@ class DialogManagerTests(unittest.TestCase):
             }
 
             reply, _, _ = await manager.process(
-                "хочу в кружок",
+                "хочу другой кружок",
                 {"intent": {"name": "ask_enroll"}, "entities": [{"entity": "grade", "value": "89748234794"}]},
                 session,
             )
@@ -161,6 +161,23 @@ class DialogManagerTests(unittest.TestCase):
             self.assertNotIn("grade", session)
             self.assertEqual(session["state"], "AWAITING_GRADE_OR_DISCIPLINE")
             self.assertEqual(reply, "Отлично! Какой предмет вас интересует и для какого класса?")
+
+        asyncio.run(scenario())
+
+    def test_enroll_intent_does_not_clear_active_flow(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {"state": "AWAITING_GRADE_OR_DISCIPLINE", "discipline": "математика"}
+
+            reply, _, _ = await manager.process(
+                "5 класс",
+                {"intent": {"name": "ask_enroll"}, "entities": [{"entity": "grade", "value": "5 класс"}]},
+                session,
+            )
+
+            self.assertEqual(session["discipline"], "математика")
+            self.assertEqual(session["grade"], "5 класс")
+            self.assertIn("Мы нашли площадки", reply)
 
         asyncio.run(scenario())
 

@@ -84,12 +84,15 @@ class DialogManager:
     def _is_camp_question(self, text: str) -> bool:
         return bool(re.search(r"\b(лагер|смен|летн|лето|выездн|городск)\w*", text.lower()))
 
+    def _is_restart_request(self, text: str) -> bool:
+        return bool(re.search(r"\b(заново|сначала|друг(ой|ая|ие)|нов(ый|ая|ое))\b", text.lower()))
+
     async def process(self, text: str, rasa_resp: Dict[str, Any], session: Dict[str, Any]) -> Tuple[str, bool, bool]:
         intent = rasa_resp.get("intent", {}).get("name", "None")
         entities = rasa_resp.get("entities", [])
         original_state = session.get("state", "IDLE")
 
-        if intent == "ask_enroll":
+        if intent == "ask_enroll" and (original_state == "IDLE" or self._is_restart_request(text)):
             self._clear_enrollment_fields(session)
 
         for ent in entities:
@@ -111,7 +114,7 @@ class DialogManager:
             session["state"] = "IDLE"
             return "У нас есть выездные и городские смены. Подробности: fractalclub.ru/camps", False, False
 
-        if intent == "ask_enroll":
+        if intent == "ask_enroll" and (state == "IDLE" or self._is_restart_request(text)):
             session["state"] = "AWAITING_GRADE_OR_DISCIPLINE"
             state = "AWAITING_GRADE_OR_DISCIPLINE"
 
