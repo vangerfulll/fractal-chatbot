@@ -10,16 +10,41 @@ logger = logging.getLogger(__name__)
 
 
 class DialogManager:
+    ENROLLMENT_FIELDS = (
+        "discipline",
+        "grade",
+        "location",
+        "available_groups",
+        "group_id",
+        "group_name",
+        "group_schedule",
+        "parent_name",
+        "phone",
+    )
+
     def __init__(self, hollihop_api: HollihopClient):
         self.hollihop = hollihop_api
 
+    def _clear_enrollment_fields(self, session: Dict[str, Any]) -> None:
+        for field in self.ENROLLMENT_FIELDS:
+            session.pop(field, None)
+
     def _normalize_phone(self, text: str) -> str | None:
+        digits = re.sub(r"\D", "", text)
+        if len(digits) == 10:
+            digits = f"7{digits}"
+        elif len(digits) == 11 and digits.startswith("8"):
+            digits = f"7{digits[1:]}"
+
+        if len(digits) != 11 or not digits.startswith("7") or digits[1] != "9":
+            return None
+
         try:
-            phone = phonenumbers.parse(text, "RU")
+            phone = phonenumbers.parse(f"+{digits}", "RU")
         except phonenumbers.NumberParseException:
             return None
 
-        if not phonenumbers.is_valid_number(phone):
+        if not phonenumbers.is_valid_number_for_region(phone, "RU"):
             return None
 
         return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
@@ -62,14 +87,21 @@ class DialogManager:
     async def process(self, text: str, rasa_resp: Dict[str, Any], session: Dict[str, Any]) -> Tuple[str, bool, bool]:
         intent = rasa_resp.get("intent", {}).get("name", "None")
         entities = rasa_resp.get("entities", [])
+        original_state = session.get("state", "IDLE")
+
+        if intent == "ask_enroll" and original_state == "IDLE":
+            self._clear_enrollment_fields(session)
 
         for ent in entities:
             ent_name = ent.get("entity")
             ent_val = ent.get("value")
-            if ent_name in ["discipline", "grade", "location"]:
+            if ent_name in ["discipline", "grade"] and (
+                original_state == "AWAITING_GRADE_OR_DISCIPLINE" or intent == "ask_enroll"
+            ):
+                session[ent_name] = ent_val
+            elif ent_name == "location" and original_state == "AWAITING_GROUP":
                 session[ent_name] = ent_val
 
-        original_state = session.get("state", "IDLE")
         state = original_state
 
         if intent == "request_operator":
@@ -196,6 +228,7 @@ class DialogManager:
                         f"расписание: {session.get('group_schedule', 'не выбрано')}"
                     ),
                 )
+                self._clear_enrollment_fields(session)
                 session["state"] = "IDLE"
 
                 if success:

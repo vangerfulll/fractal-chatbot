@@ -47,6 +47,11 @@ class DialogManagerTests(unittest.TestCase):
 
         self.assertIsNone(manager._normalize_phone("1234567"))
 
+    def test_rejects_non_russian_mobile_phone(self):
+        manager = DialogManager(FakeHollihop())
+
+        self.assertIsNone(manager._normalize_phone("57345897345"))
+
     def test_collects_free_text_discipline_without_rasa_entity(self):
         async def scenario():
             manager = DialogManager(FakeHollihop())
@@ -92,6 +97,60 @@ class DialogManagerTests(unittest.TestCase):
 
             self.assertNotIn("discipline", session)
             self.assertEqual(reply, "Отлично! Какой предмет вас интересует и для какого класса?")
+
+        asyncio.run(scenario())
+
+    def test_new_enroll_clears_previous_enrollment_data(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {
+                "state": "IDLE",
+                "discipline": "математика",
+                "grade": "57345897345",
+                "location": "Онлайн",
+                "group_id": 101,
+            }
+
+            reply, _, _ = await manager.process(
+                "хочу на кружок",
+                {"intent": {"name": "ask_enroll"}, "entities": []},
+                session,
+            )
+
+            self.assertNotIn("discipline", session)
+            self.assertNotIn("grade", session)
+            self.assertEqual(session["state"], "AWAITING_GRADE_OR_DISCIPLINE")
+            self.assertEqual(reply, "Отлично! Какой предмет вас интересует и для какого класса?")
+
+        asyncio.run(scenario())
+
+    def test_successful_lead_clears_enrollment_data(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {
+                "state": "AWAITING_PHONE",
+                "discipline": "математика",
+                "grade": "5 класс",
+                "location": "Онлайн",
+                "group_id": 101,
+                "group_name": "Математика",
+                "group_schedule": "Вт 16:00",
+                "parent_name": "Матвей",
+            }
+
+            reply, should_transfer, lead_created = await manager.process(
+                "+79991234567",
+                {"intent": {"name": "None"}, "entities": [{"entity": "grade", "value": "79991234567"}]},
+                session,
+            )
+
+            self.assertIn("Спасибо", reply)
+            self.assertFalse(should_transfer)
+            self.assertTrue(lead_created)
+            self.assertEqual(session["state"], "IDLE")
+            self.assertNotIn("discipline", session)
+            self.assertNotIn("grade", session)
+            self.assertNotIn("phone", session)
 
         asyncio.run(scenario())
 
