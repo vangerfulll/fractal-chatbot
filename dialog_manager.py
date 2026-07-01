@@ -56,6 +56,9 @@ class DialogManager:
             return None
         return clean_text
 
+    def _is_camp_question(self, text: str) -> bool:
+        return bool(re.search(r"\b(лагер|смен|летн|лето|выездн|городск)\w*", text.lower()))
+
     async def process(self, text: str, rasa_resp: Dict[str, Any], session: Dict[str, Any]) -> Tuple[str, bool, bool]:
         intent = rasa_resp.get("intent", {}).get("name", "None")
         entities = rasa_resp.get("entities", [])
@@ -72,7 +75,7 @@ class DialogManager:
         if intent == "request_operator":
             return "Переводим на оператора...", True, False
 
-        if intent == "ask_faq_camps" and state == "IDLE":
+        if intent == "ask_faq_camps" and state == "IDLE" and self._is_camp_question(text):
             session["state"] = "IDLE"
             return "У нас есть выездные и городские смены. Подробности: fractalclub.ru/camps", False, False
 

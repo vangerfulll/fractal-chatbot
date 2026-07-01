@@ -95,6 +95,36 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_false_camp_intent_without_camp_words_does_not_answer_camps(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {}
+
+            reply, _, _ = await manager.process(
+                "василеостровская",
+                {"intent": {"name": "ask_faq_camps"}, "entities": []},
+                session,
+            )
+
+            self.assertNotIn("fractalclub.ru/camps", reply)
+
+        asyncio.run(scenario())
+
+    def test_real_camp_question_still_answers_camps(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {}
+
+            reply, _, _ = await manager.process(
+                "какие лагеря есть летом",
+                {"intent": {"name": "ask_faq_camps"}, "entities": []},
+                session,
+            )
+
+            self.assertIn("fractalclub.ru/camps", reply)
+
+        asyncio.run(scenario())
+
     def test_enroll_flow_reaches_phone_step(self):
         async def scenario():
             manager = DialogManager(FakeHollihop())
