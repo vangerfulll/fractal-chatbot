@@ -84,6 +84,23 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_does_not_extract_grade_from_invalid_two_digit_class(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {"state": "AWAITING_GRADE_OR_DISCIPLINE"}
+
+            reply, _, _ = await manager.process(
+                "математика 15 класс",
+                {"intent": {"name": "None"}, "entities": []},
+                session,
+            )
+
+            self.assertEqual(session["discipline"], "математика 15 класс")
+            self.assertNotIn("grade", session)
+            self.assertEqual(reply, "Хорошо. А в каком классе учится ребенок?")
+
+        asyncio.run(scenario())
+
     def test_enroll_trigger_is_not_saved_as_discipline(self):
         async def scenario():
             manager = DialogManager(FakeHollihop())

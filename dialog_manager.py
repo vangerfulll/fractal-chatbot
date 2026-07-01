@@ -67,14 +67,14 @@ class DialogManager:
         return None
 
     def _extract_grade(self, text: str) -> str | None:
-        match = re.search(r"(?<!\d)([1-9]|1[0-1])\s*(?:класс[а-я]*|кл\.?)?(?!\d)", text.lower())
+        match = re.search(r"(?<!\d)(1[0-1]|[1-9])\s*(?:класс[а-я]*|кл\.?)?(?!\d)", text.lower())
         if not match:
             return None
         return f"{match.group(1)} класс"
 
     def _extract_discipline_text(self, text: str) -> str | None:
         clean_text = text.strip().lower()
-        clean_text = re.sub(r"(?<!\d)([1-9]|1[0-1])\s*(?:класс[а-я]*|кл\.?)?(?!\d)", "", clean_text)
+        clean_text = re.sub(r"(?<!\d)(1[0-1]|[1-9])\s*(?:класс[а-я]*|кл\.?)?(?!\d)", "", clean_text)
         clean_text = re.sub(r"\s+", " ", clean_text).strip(" .,;:-")
 
         if not clean_text or not re.search(r"[а-яa-z]", clean_text):
