@@ -141,6 +141,29 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_new_enroll_restarts_flow_from_any_state(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {
+                "state": "AWAITING_LOCATION",
+                "discipline": "математика",
+                "grade": "89748234794",
+                "location": "Онлайн",
+            }
+
+            reply, _, _ = await manager.process(
+                "хочу в кружок",
+                {"intent": {"name": "ask_enroll"}, "entities": [{"entity": "grade", "value": "89748234794"}]},
+                session,
+            )
+
+            self.assertNotIn("discipline", session)
+            self.assertNotIn("grade", session)
+            self.assertEqual(session["state"], "AWAITING_GRADE_OR_DISCIPLINE")
+            self.assertEqual(reply, "Отлично! Какой предмет вас интересует и для какого класса?")
+
+        asyncio.run(scenario())
+
     def test_successful_lead_clears_enrollment_data(self):
         async def scenario():
             manager = DialogManager(FakeHollihop())

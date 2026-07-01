@@ -89,14 +89,14 @@ class DialogManager:
         entities = rasa_resp.get("entities", [])
         original_state = session.get("state", "IDLE")
 
-        if intent == "ask_enroll" and original_state == "IDLE":
+        if intent == "ask_enroll":
             self._clear_enrollment_fields(session)
 
         for ent in entities:
             ent_name = ent.get("entity")
             ent_val = ent.get("value")
             if ent_name in ["discipline", "grade"] and (
-                original_state == "AWAITING_GRADE_OR_DISCIPLINE" or intent == "ask_enroll"
+                original_state == "AWAITING_GRADE_OR_DISCIPLINE" or (intent == "ask_enroll" and original_state == "IDLE")
             ):
                 session[ent_name] = ent_val
             elif ent_name == "location" and original_state == "AWAITING_GROUP":
@@ -111,7 +111,7 @@ class DialogManager:
             session["state"] = "IDLE"
             return "У нас есть выездные и городские смены. Подробности: fractalclub.ru/camps", False, False
 
-        if intent == "ask_enroll" and state == "IDLE":
+        if intent == "ask_enroll":
             session["state"] = "AWAITING_GRADE_OR_DISCIPLINE"
             state = "AWAITING_GRADE_OR_DISCIPLINE"
 
