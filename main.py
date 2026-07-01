@@ -63,7 +63,8 @@ async def process_jivo_message(event: dict) -> bool:
             logger.warning("Invalid Jivo AGENT_UNAVAILABLE payload: missing chat_id or client_id")
             return True
 
-        session = await session_mgr.get_session(chat_id)
+        session_key = client_id
+        session = await session_mgr.get_session(session_key)
         if session.get("agent_unavailable_greeting_sent"):
             return True
 
@@ -73,7 +74,7 @@ async def process_jivo_message(event: dict) -> bool:
         )
         session["agent_unavailable_greeting_sent"] = True
         session["chat_history"] = session.get("chat_history", "") + f"Bot: {reply_text}\n"
-        await session_mgr.save_session(chat_id, session)
+        await session_mgr.save_session(session_key, session)
         return await jivo_api.send_message(client_id, chat_id, reply_text)
 
     if event_name not in ("CLIENT_MESSAGE", "client_message"):
@@ -85,9 +86,10 @@ async def process_jivo_message(event: dict) -> bool:
         logger.warning("Invalid Jivo CLIENT_MESSAGE payload: missing chat_id, client_id or text")
         return False
 
-    logger.info("New Jivo message in chat %s", chat_id)
+    session_key = client_id
+    logger.info("New Jivo message in chat %s from client %s", chat_id, client_id)
 
-    session = await session_mgr.get_session(chat_id)
+    session = await session_mgr.get_session(session_key)
     chat_history = session.get("chat_history", "")
     chat_history += f"Client: {text}\n"
 
@@ -111,7 +113,7 @@ async def process_jivo_message(event: dict) -> bool:
         return False
 
     session["chat_history"] = chat_history
-    await session_mgr.save_session(chat_id, session)
+    await session_mgr.save_session(session_key, session)
     return True
 
 
