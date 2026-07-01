@@ -58,6 +58,24 @@ async def process_jivo_message(event: dict) -> bool:
     chat_id = str(event.get("chat_id") or "")
     client_id = str(event.get("client_id") or event.get("sender", {}).get("id") or "")
 
+    if event_name in ("AGENT_UNAVAILABLE", "agent_unavailable"):
+        if not chat_id or not client_id:
+            logger.warning("Invalid Jivo AGENT_UNAVAILABLE payload: missing chat_id or client_id")
+            return True
+
+        session = await session_mgr.get_session(chat_id)
+        if session.get("agent_unavailable_greeting_sent"):
+            return True
+
+        reply_text = (
+            "Здравствуйте! Я помощник клуба «Фрактал». Хотите записаться в группу "
+            "или узнать о лагерях?"
+        )
+        session["agent_unavailable_greeting_sent"] = True
+        session["chat_history"] = session.get("chat_history", "") + f"Bot: {reply_text}\n"
+        await session_mgr.save_session(chat_id, session)
+        return await jivo_api.send_message(client_id, chat_id, reply_text)
+
     if event_name not in ("CLIENT_MESSAGE", "client_message"):
         logger.info("Unsupported Jivo event ignored: %s", event_name)
         return True
