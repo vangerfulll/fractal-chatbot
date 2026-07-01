@@ -71,6 +71,28 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_active_enroll_flow_ignores_false_camp_intent(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {
+                "state": "AWAITING_GROUP",
+                "discipline": "олимпиадная геометрия",
+                "grade": "5 класс",
+            }
+
+            reply, should_transfer, lead_created = await manager.process(
+                "Василеостровская",
+                {"intent": {"name": "ask_faq_camps"}, "entities": []},
+                session,
+            )
+
+            self.assertIn("Вот доступные группы", reply)
+            self.assertFalse(should_transfer)
+            self.assertFalse(lead_created)
+            self.assertEqual(session["state"], "AWAITING_GROUP_SELECTION")
+
+        asyncio.run(scenario())
+
 
 if __name__ == "__main__":
     unittest.main()

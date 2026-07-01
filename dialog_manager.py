@@ -56,7 +56,7 @@ class DialogManager:
         if intent == "request_operator":
             return "Переводим на оператора...", True, False
 
-        if intent == "ask_faq_camps":
+        if intent == "ask_faq_camps" and state == "IDLE":
             session["state"] = "IDLE"
             return "У нас есть выездные и городские смены. Подробности: fractalclub.ru/camps", False, False
 
