@@ -41,6 +41,21 @@ class DialogManager:
 
         return None
 
+    def _extract_grade(self, text: str) -> str | None:
+        match = re.search(r"(?<!\d)([1-9]|1[0-1])\s*(?:класс[а-я]*|кл\.?)?(?!\d)", text.lower())
+        if not match:
+            return None
+        return f"{match.group(1)} класс"
+
+    def _extract_discipline_text(self, text: str) -> str | None:
+        clean_text = text.strip().lower()
+        clean_text = re.sub(r"(?<!\d)([1-9]|1[0-1])\s*(?:класс[а-я]*|кл\.?)?(?!\d)", "", clean_text)
+        clean_text = re.sub(r"\s+", " ", clean_text).strip(" .,;:-")
+
+        if not clean_text or not re.search(r"[а-яa-z]", clean_text):
+            return None
+        return clean_text
+
     async def process(self, text: str, rasa_resp: Dict[str, Any], session: Dict[str, Any]) -> Tuple[str, bool, bool]:
         intent = rasa_resp.get("intent", {}).get("name", "None")
         entities = rasa_resp.get("entities", [])
@@ -51,7 +66,8 @@ class DialogManager:
             if ent_name in ["discipline", "grade", "location"]:
                 session[ent_name] = ent_val
 
-        state = session.get("state", "IDLE")
+        original_state = session.get("state", "IDLE")
+        state = original_state
 
         if intent == "request_operator":
             return "Переводим на оператора...", True, False
@@ -65,6 +81,16 @@ class DialogManager:
             state = "AWAITING_GRADE_OR_DISCIPLINE"
 
         if state == "AWAITING_GRADE_OR_DISCIPLINE":
+            if original_state == "AWAITING_GRADE_OR_DISCIPLINE":
+                if not session.get("grade"):
+                    grade_from_text = self._extract_grade(text)
+                    if grade_from_text:
+                        session["grade"] = grade_from_text
+                if not session.get("discipline"):
+                    discipline_from_text = self._extract_discipline_text(text)
+                    if discipline_from_text:
+                        session["discipline"] = discipline_from_text
+
             discipline = session.get("discipline")
             grade = session.get("grade")
 

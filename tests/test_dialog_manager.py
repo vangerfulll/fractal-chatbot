@@ -47,6 +47,54 @@ class DialogManagerTests(unittest.TestCase):
 
         self.assertIsNone(manager._normalize_phone("1234567"))
 
+    def test_collects_free_text_discipline_without_rasa_entity(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {"state": "AWAITING_GRADE_OR_DISCIPLINE"}
+
+            reply, _, _ = await manager.process(
+                "олимпиадная геометрия",
+                {"intent": {"name": "None"}, "entities": []},
+                session,
+            )
+
+            self.assertEqual(session["discipline"], "олимпиадная геометрия")
+            self.assertEqual(reply, "Хорошо. А в каком классе учится ребенок?")
+
+        asyncio.run(scenario())
+
+    def test_collects_free_text_grade_without_rasa_entity(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {"state": "AWAITING_GRADE_OR_DISCIPLINE", "discipline": "олимпиадная геометрия"}
+
+            reply, _, _ = await manager.process(
+                "5",
+                {"intent": {"name": "None"}, "entities": []},
+                session,
+            )
+
+            self.assertEqual(session["grade"], "5 класс")
+            self.assertIn("Мы нашли площадки", reply)
+
+        asyncio.run(scenario())
+
+    def test_enroll_trigger_is_not_saved_as_discipline(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {}
+
+            reply, _, _ = await manager.process(
+                "Записаться на занятия",
+                {"intent": {"name": "ask_enroll"}, "entities": []},
+                session,
+            )
+
+            self.assertNotIn("discipline", session)
+            self.assertEqual(reply, "Отлично! Какой предмет вас интересует и для какого класса?")
+
+        asyncio.run(scenario())
+
     def test_enroll_flow_reaches_phone_step(self):
         async def scenario():
             manager = DialogManager(FakeHollihop())
