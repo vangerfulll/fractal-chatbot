@@ -10,8 +10,3 @@ rules:
   steps:
   - intent: request_operator
   - action: utter_transfer
-
-- rule: Ответ про лагеря
-  steps:
-  - intent: ask_faq_camps
-  - action: utter_faq_camps

@@ -211,36 +211,6 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
-    def test_false_camp_intent_without_camp_words_does_not_answer_camps(self):
-        async def scenario():
-            manager = DialogManager(FakeHollihop())
-            session = {}
-
-            reply, _, _ = await manager.process(
-                "василеостровская",
-                {"intent": {"name": "ask_faq_camps"}, "entities": []},
-                session,
-            )
-
-            self.assertNotIn("fractalclub.ru/camps", reply)
-
-        asyncio.run(scenario())
-
-    def test_real_camp_question_still_answers_camps(self):
-        async def scenario():
-            manager = DialogManager(FakeHollihop())
-            session = {}
-
-            reply, _, _ = await manager.process(
-                "какие лагеря есть летом",
-                {"intent": {"name": "ask_faq_camps"}, "entities": []},
-                session,
-            )
-
-            self.assertIn("fractalclub.ru/camps", reply)
-
-        asyncio.run(scenario())
-
     def test_enroll_flow_reaches_phone_step(self):
         async def scenario():
             manager = DialogManager(FakeHollihop())
@@ -262,28 +232,6 @@ class DialogManagerTests(unittest.TestCase):
 
             self.assertEqual(session["group_id"], 102)
             self.assertEqual(session["state"], "AWAITING_NAME")
-
-        asyncio.run(scenario())
-
-    def test_active_enroll_flow_ignores_false_camp_intent(self):
-        async def scenario():
-            manager = DialogManager(FakeHollihop())
-            session = {
-                "state": "AWAITING_GROUP",
-                "discipline": "олимпиадная геометрия",
-                "grade": "5 класс",
-            }
-
-            reply, should_transfer, lead_created = await manager.process(
-                "Василеостровская",
-                {"intent": {"name": "ask_faq_camps"}, "entities": []},
-                session,
-            )
-
-            self.assertIn("Вот доступные группы", reply)
-            self.assertFalse(should_transfer)
-            self.assertFalse(lead_created)
-            self.assertEqual(session["state"], "AWAITING_GROUP_SELECTION")
 
         asyncio.run(scenario())
 

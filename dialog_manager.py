@@ -81,8 +81,6 @@ class DialogManager:
             return None
         return clean_text
 
-    def _is_camp_question(self, text: str) -> bool:
-        return bool(re.search(r"\b(лагер|смен|летн|лето|выездн|городск)\w*", text.lower()))
 
     def _is_operator_request(self, text: str) -> bool:
         return bool(re.search(r"\b(оператор|менеджер|администратор|человек|жив(ой|ого))\w*", text.lower()))
@@ -113,9 +111,6 @@ class DialogManager:
         if intent == "request_operator" and self._is_operator_request(text):
             return "Переводим на оператора...", True, False
 
-        if intent == "ask_faq_camps" and state == "IDLE" and self._is_camp_question(text):
-            session["state"] = "IDLE"
-            return "У нас есть выездные и городские смены. Подробности: fractalclub.ru/camps", False, False
 
         if intent == "ask_enroll" and (state == "IDLE" or self._is_restart_request(text)):
             session["state"] = "AWAITING_GRADE_OR_DISCIPLINE"
@@ -256,14 +251,13 @@ class DialogManager:
 
         if intent == "greet":
             return (
-                "Здравствуйте! Я помощник клуба «Фрактал». Хотите записаться в группу "
-                "или узнать о лагерях?",
+                "Здравствуйте! Я помощник клуба «Фрактал». Хотите записаться в группу?",
                 False,
                 False,
             )
 
         return (
-            "Не совсем понял вас. Вы можете спросить про запись в кружок или про наши лагеря. "
+            "Не совсем понял вас. Вы можете спросить про запись в кружок. "
             "Позвать оператора?",
             False,
             False,

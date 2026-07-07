@@ -77,8 +77,7 @@ async def process_jivo_message(event: dict) -> bool:
             return True
 
         reply_text = (
-            "Здравствуйте! Я помощник клуба «Фрактал». Хотите записаться в группу "
-            "или узнать о лагерях?"
+            "Здравствуйте! Я помощник клуба «Фрактал». Хотите записаться в группу?"
         )
         session["agent_unavailable_greeting_sent"] = True
         session["chat_history"] = session.get("chat_history", "") + f"Bot: {reply_text}\n"
