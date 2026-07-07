@@ -29,7 +29,7 @@ class SessionManager:
         if data:
             return json.loads(data)
         # Если сессии нет (новый пользователь)
-        return {"step": "init", "collected_data": {}}
+        return {"state": "IDLE", "chat_history": ""}
 
     async def save_session(self, chat_id: str, session_data: Dict[str, Any], expire_seconds: int = 3600):
         """Сохранить контекст. По умолчанию удаляется через час неактивности."""

@@ -1,5 +1,7 @@
 import logging
 import uuid
+import asyncio
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -30,7 +32,14 @@ def validate_startup_settings() -> None:
 
 validate_startup_settings()
 
-app = FastAPI(title="Fractal Club Chatbot")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    if session_mgr.client:
+        await session_mgr.client.close()
+        logger.info("Closed Redis connection pool")
+
+app = FastAPI(title="Fractal Club Chatbot", lifespan=lifespan)
 
 jivo_api = JivoClient(
     api_url=settings.JIVO_API_URL,
@@ -95,7 +104,8 @@ async def process_jivo_message(event: dict) -> bool:
     reply_text, should_transfer, lead_created = await dialog_mgr.process(text, rasa_resp, session)
 
     if lead_created and settings.ADMIN_EMAIL:
-        email_api.send_notification(
+        await asyncio.to_thread(
+            email_api.send_notification,
             settings.ADMIN_EMAIL,
             "New lead from chat",
             chat_history + f"\nClient: {text}",
@@ -153,7 +163,14 @@ async def _handle_jivo_webhook(request: Request, token: str):
     if not settings.JIVO_BOT_TOKEN or token != settings.JIVO_BOT_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid Jivo token")
 
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid payload format")
+
     logger.info("Received Jivo event: %s", payload.get("event") or payload.get("event_name"))
 
     if not await process_jivo_message(payload):

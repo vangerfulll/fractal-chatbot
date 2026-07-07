@@ -287,6 +287,99 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_active_enroll_flow_ignores_false_operator_intent_for_online(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {
+                "state": "AWAITING_GROUP",
+                "discipline": "физика",
+                "grade": "9 класс",
+            }
+
+            reply, should_transfer, lead_created = await manager.process(
+                "онлайн",
+                {"intent": {"name": "request_operator"}, "entities": []},
+                session,
+            )
+
+            self.assertIn("Вот доступные группы", reply)
+            self.assertFalse(should_transfer)
+            self.assertFalse(lead_created)
+            self.assertEqual(session["state"], "AWAITING_GROUP_SELECTION")
+
+        asyncio.run(scenario())
+
+    def test_real_operator_request_still_transfers(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {"state": "AWAITING_GROUP"}
+
+            reply, should_transfer, lead_created = await manager.process(
+                "позовите оператора",
+                {"intent": {"name": "request_operator"}, "entities": []},
+                session,
+            )
+
+            self.assertIn("оператора", reply.lower())
+            self.assertTrue(should_transfer)
+            self.assertFalse(lead_created)
+
+        asyncio.run(scenario())
+
+    def test_select_group_ignores_embedded_numbers(self):
+        manager = DialogManager(FakeHollihop())
+        groups = [
+            {"id": 101, "name": "Математика", "schedule": "Вт 16:00", "vacancy": 3},
+            {"id": 102, "name": "Физика", "schedule": "Чт 18:00", "vacancy": 5},
+        ]
+        self.assertIsNone(manager._select_group("у меня 2 ребенка", groups))
+        self.assertEqual(manager._select_group("Вт 16:00", groups)["id"], 101)
+        self.assertEqual(manager._select_group("номер 2", groups)["id"], 102)
+
+    def test_skips_location_selection_if_preselected(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {
+                "state": "AWAITING_GRADE_OR_DISCIPLINE",
+                "discipline": "математика",
+                "location": "Онлайн"
+            }
+            reply, _, _ = await manager.process(
+                "3 класс",
+                {"intent": {"name": "None"}, "entities": [{"entity": "grade", "value": "3 класс"}]},
+                session
+            )
+            self.assertEqual(session["state"], "AWAITING_GROUP_SELECTION")
+            self.assertIn("Вот доступные группы", reply)
+            self.assertEqual(session["location"], "Онлайн")
+            self.assertEqual(len(session["available_groups"]), 2)
+
+        asyncio.run(scenario())
+
+    def test_clears_fields_when_no_locations(self):
+        class EmptyLocationsHollihop:
+            async def get_locations(self, discipline, grade):
+                return []
+
+        async def scenario():
+            manager = DialogManager(EmptyLocationsHollihop())
+            session = {
+                "state": "AWAITING_LOCATION",
+                "discipline": "математика",
+                "grade": "3 класс"
+            }
+            reply, should_transfer, lead_created = await manager.process(
+                "хочу записаться",
+                {"intent": {"name": "None"}, "entities": []},
+                session
+            )
+            self.assertEqual(session["state"], "IDLE")
+            self.assertNotIn("discipline", session)
+            self.assertNotIn("grade", session)
+            self.assertTrue(should_transfer)
+
+        asyncio.run(scenario())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -51,10 +51,10 @@ class DialogManager:
 
     def _select_group(self, text: str, groups: list[Dict[str, Any]]) -> Dict[str, Any] | None:
         clean_text = text.strip().lower()
-        number_match = re.search(r"\d+", clean_text)
+        number_match = re.match(r"^(?:№|номер\s+)?(\d+)(?:\.|\))?$", clean_text)
 
         if number_match:
-            idx = int(number_match.group()) - 1
+            idx = int(number_match.group(1)) - 1
             if 0 <= idx < len(groups):
                 return groups[idx]
 
@@ -84,6 +84,9 @@ class DialogManager:
     def _is_camp_question(self, text: str) -> bool:
         return bool(re.search(r"\b(лагер|смен|летн|лето|выездн|городск)\w*", text.lower()))
 
+    def _is_operator_request(self, text: str) -> bool:
+        return bool(re.search(r"\b(оператор|менеджер|администратор|человек|жив(ой|ого))\w*", text.lower()))
+
     def _is_restart_request(self, text: str) -> bool:
         return bool(re.search(r"\b(заново|сначала|друг(ой|ая|ие)|нов(ый|ая|ое))\b", text.lower()))
 
@@ -102,12 +105,12 @@ class DialogManager:
                 original_state == "AWAITING_GRADE_OR_DISCIPLINE" or (intent == "ask_enroll" and original_state == "IDLE")
             ):
                 session[ent_name] = ent_val
-            elif ent_name == "location" and original_state == "AWAITING_GROUP":
+            elif ent_name == "location" and original_state in ("IDLE", "AWAITING_GRADE_OR_DISCIPLINE", "AWAITING_GROUP"):
                 session[ent_name] = ent_val
 
         state = original_state
 
-        if intent == "request_operator":
+        if intent == "request_operator" and self._is_operator_request(text):
             return "Переводим на оператора...", True, False
 
         if intent == "ask_faq_camps" and state == "IDLE" and self._is_camp_question(text):
@@ -148,6 +151,7 @@ class DialogManager:
             locations = await self.hollihop.get_locations(discipline, grade)
 
             if not locations:
+                self._clear_enrollment_fields(session)
                 session["state"] = "IDLE"
                 return (
                     f"К сожалению, сейчас нет доступных площадок по запросу: {discipline}, {grade}. "
@@ -156,14 +160,19 @@ class DialogManager:
                     False,
                 )
 
-            session["state"] = "AWAITING_GROUP"
-            loc_list = ", ".join(locations)
-            return (
-                f"Мы нашли площадки для {discipline} ({grade}): {loc_list}. "
-                "Какая вам удобнее всего?",
-                False,
-                False,
-            )
+            preselected_location = session.get("location")
+            if preselected_location:
+                session["state"] = "AWAITING_GROUP"
+                state = "AWAITING_GROUP"
+            else:
+                session["state"] = "AWAITING_GROUP"
+                loc_list = ", ".join(locations)
+                return (
+                    f"Мы нашли площадки для {discipline} ({grade}): {loc_list}. "
+                    "Какая вам удобнее всего?",
+                    False,
+                    False,
+                )
 
         if state == "AWAITING_GROUP":
             location = session.get("location")

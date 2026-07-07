@@ -19,7 +19,7 @@ class HollihopClient:
         if not domain:
             return ""
 
-        for suffix in ("/Api/V2/", "/Api/V2", "/api/v2/", "/api/v2"):
+        for suffix in ("/Api/V2/", "/Api/V2", "/api/v2/", "/api/v2", "/v2/", "/v2"):
             if domain.endswith(suffix):
                 domain = domain[: -len(suffix)]
 
