@@ -328,6 +328,20 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_idle_affirmation_triggers_enrollment(self):
+        async def scenario():
+            manager = DialogManager(FakeHollihop())
+            session = {"state": "IDLE"}
+            reply, _, _ = await manager.process(
+                "Да",
+                {"intent": {"name": "greet"}, "entities": []},
+                session
+            )
+            self.assertEqual(session["state"], "AWAITING_GRADE_OR_DISCIPLINE")
+            self.assertEqual(reply, "Отлично! Какой предмет вас интересует и для какого класса?")
+
+        asyncio.run(scenario())
+
 
 if __name__ == "__main__":
     unittest.main()

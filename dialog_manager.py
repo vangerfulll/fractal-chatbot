@@ -81,6 +81,9 @@ class DialogManager:
             return None
         return clean_text
 
+    def _is_affirmation(self, text: str) -> bool:
+        clean_text = text.strip().lower()
+        return clean_text in ("да", "хочу", "давай", "конечно", "да, хочу", "ок", "окей", "хорошо", "yes", "ok", "давай записывай")
 
     def _is_operator_request(self, text: str) -> bool:
         return bool(re.search(r"\b(оператор|менеджер|администратор|человек|жив(ой|ого))\w*", text.lower()))
@@ -92,6 +95,9 @@ class DialogManager:
         intent = rasa_resp.get("intent", {}).get("name", "None")
         entities = rasa_resp.get("entities", [])
         original_state = session.get("state", "IDLE")
+
+        if original_state == "IDLE" and self._is_affirmation(text):
+            intent = "ask_enroll"
 
         if intent == "ask_enroll" and (original_state == "IDLE" or self._is_restart_request(text)):
             self._clear_enrollment_fields(session)
