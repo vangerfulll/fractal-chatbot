@@ -188,6 +188,7 @@ class DialogManager:
             )
 
             if not groups:
+                session.pop("location", None)
                 return f"На площадке {location} пока не найдено групп. Попробуем другую?", False, False
 
             reply = "Отлично! Вот доступные группы:\n"

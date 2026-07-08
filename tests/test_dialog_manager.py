@@ -342,6 +342,31 @@ class DialogManagerTests(unittest.TestCase):
 
         asyncio.run(scenario())
 
+    def test_invalid_location_clears_location_field(self):
+        class MockHollihopEmptyGroups:
+            async def get_groups_for_location(self, discipline, grade, location):
+                if location == "Несуществующая":
+                    return []
+                return [{"id": 101, "name": "Группа", "schedule": "Вт 16:00", "vacancy": 3}]
+
+        async def scenario():
+            manager = DialogManager(MockHollihopEmptyGroups())
+            session = {
+                "state": "AWAITING_GROUP",
+                "discipline": "математика",
+                "grade": "3 класс"
+            }
+            reply, _, _ = await manager.process("Несуществующая", {"intent": {"name": "None"}, "entities": []}, session)
+            self.assertIn("пока не найдено групп", reply)
+            self.assertEqual(session["state"], "AWAITING_GROUP")
+            self.assertNotIn("location", session)
+
+            reply, _, _ = await manager.process("Онлайн", {"intent": {"name": "None"}, "entities": []}, session)
+            self.assertEqual(session["state"], "AWAITING_GROUP_SELECTION")
+            self.assertEqual(session["location"], "Онлайн")
+
+        asyncio.run(scenario())
+
 
 if __name__ == "__main__":
     unittest.main()
